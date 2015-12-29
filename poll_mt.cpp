@@ -2,6 +2,15 @@
  * Copyright 2015 Pascal Mainini
  * Licensed under MIT license, see included file LICENSE or
  * http://opensource.org/licenses/MIT
+ *
+ * A simple, threaded implementation of tag-discovery using linux_libnfc-nci
+ * (https://github.com/NXPNFCLinux/linux_libnfc-nci).
+ *
+ * TODO
+ * ====
+ * - Can we detect multiple tags beeing present simultaneously?
+ *   UM10819-PN7120-User-Manual.pdf gives almost no information, the only idea
+ *   could be "PN7120 behavior with multiple VICCs", 7.1.4.4 / p. 61
  */
 
 #include <stdio.h>
@@ -89,8 +98,8 @@ int main(int argc, char ** argv)
     printf("nfcManager_getFwVersion:\t0x%x\n\n", nfcManager_getFwVersion());
 
     // start tag-discovery
-    // TODO is it possible to look for multiple tags "at the same time"?
-    nfcManager_enableDiscovery(DEFAULT_NFA_TECH_MASK, 0, 0, 0);
+    // enableDiscovery(technologies_masks, reader_only_mode, enable_host_routing, restart)
+    nfcManager_enableDiscovery(DEFAULT_NFA_TECH_MASK, 1, 0, 0);
 
     // main loop, performs handling of read tags
     while(do_poll)
