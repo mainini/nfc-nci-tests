@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 #include <pthread.h>
 #include <vector>
 
@@ -9,23 +10,22 @@
 #include "linux_nfc_api.h"
 
 static int keepPolling = 1;
-static std::vector <nfc_tag_info_t> tags;
+static std::vector <nfc_tag_info_t*> tags;
 static pthread_mutex_t mutex;
 
 void tagArrived(nfc_tag_info_t *p_taginfo)
 {
-    printf("\nTag arrived!\n");
-    fflush(stdout);
-
     pthread_mutex_lock(&mutex);
-    tags.push_back(*p_taginfo);
+
+    nfc_tag_info_t *temp = (nfc_tag_info_t *) malloc(sizeof(nfc_tag_info_t));
+    memcpy(temp, p_taginfo, sizeof(nfc_tag_info_t));
+    tags.push_back(temp);
+
     pthread_mutex_unlock(&mutex);
 }
 
 void tagDeparted()
 {
-    printf("\nTag departed!\n");
-    fflush(stdout);
 }
 
 int main(int argc, char ** argv)
@@ -56,7 +56,7 @@ int main(int argc, char ** argv)
 
     while(keepPolling)
     {
-        nfc_tag_info_t tag;
+        nfc_tag_info_t *tag = NULL;
 
         pthread_mutex_lock(&mutex);
 
@@ -70,9 +70,22 @@ int main(int argc, char ** argv)
         
         pthread_mutex_unlock(&mutex);
 
-        printf("Number of tags in queue: %d\n", tagcount);
-        
-        sleep(1);
+        if(tag)
+        {
+            char uid[97];
+            int len = tag->uid_length;
+            if(len > 32)
+                len = 32;
+            for(int i = 0; i < len; i++) {
+                sprintf(uid + (i*3), "%02x ", tag->uid[i]);
+            }
+            uid[len*3] = '\0';
+            printf("UID: %s\n", uid);
+
+            free(tag);
+        }
+
+        usleep(10000);
     }
 
     pthread_mutex_destroy(&mutex);
