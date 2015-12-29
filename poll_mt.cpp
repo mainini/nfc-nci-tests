@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <signal.h>
 #include <pthread.h>
 #include <vector>
 
@@ -9,9 +10,17 @@
 #include "linux_nfc_factory_api.h"
 #include "linux_nfc_api.h"
 
-static int keepPolling = 1;
-static std::vector <nfc_tag_info_t*> tags;
+#define MAX_UID_LENGTH 32
+#define MAIN_SLEEP 10000
+
+static int do_poll = 1;
+static std::vector <nfc_tag_info_t*> v_tags;
 static pthread_mutex_t mutex;
+
+static void interrupted(int signal)
+{
+    do_poll = 0;
+}
 
 void tagArrived(nfc_tag_info_t *p_taginfo)
 {
@@ -19,18 +28,41 @@ void tagArrived(nfc_tag_info_t *p_taginfo)
 
     nfc_tag_info_t *temp = (nfc_tag_info_t *) malloc(sizeof(nfc_tag_info_t));
     memcpy(temp, p_taginfo, sizeof(nfc_tag_info_t));
-    tags.push_back(temp);
+    v_tags.push_back(temp);
 
     pthread_mutex_unlock(&mutex);
 }
 
-void tagDeparted()
+void tagDeparted() { }
+
+void printTagUID(nfc_tag_info_t *p_tag)
 {
+    char uid[3*MAX_UID_LENGTH+1];
+    int len = p_tag->uid_length;
+    if(len > MAX_UID_LENGTH)
+        len = MAX_UID_LENGTH;
+
+    for(int i = 0; i < len; i++) {
+        sprintf(uid + (i*3), "%02x ", p_tag->uid[i]);
+    }
+    uid[len*3] = '\0';
+
+    printf("UID: %s\n", uid);
 }
 
 int main(int argc, char ** argv)
 {
+    struct sigaction act;
+    memset(&act, '\0', sizeof(act));
+    act.sa_handler = &interrupted;
+
+    if (sigaction(SIGINT, &act, NULL) < 0 || sigaction(SIGTERM, &act, NULL)) {
+        perror("sigaction");
+        exit(1);
+    }
+
     pthread_mutex_init(&mutex, NULL);
+
 
     // initialize nfcManager
     int result = nfcManager_doInitialize();
@@ -41,10 +73,10 @@ int main(int argc, char ** argv)
     }
 
     // try to get versions
-#ifdef NXP_HW_SELF_TEST
-    printf("nfcFactory_GetMwVersion:\t%x\n", nfcFactory_GetMwVersion());
-#endif
-    printf("nfcManager_getFwVersion:\t%x\n", nfcManager_getFwVersion());
+    #ifdef NXP_HW_SELF_TEST
+    printf("nfcFactory_GetMwVersion:\t0x%x\n", nfcFactory_GetMwVersion());
+    #endif
+    printf("nfcManager_getFwVersion:\t0x%x\n\n", nfcManager_getFwVersion());
 
     // set up tag-callback
     nfcTagCallback_t cb_tag;
@@ -52,44 +84,36 @@ int main(int argc, char ** argv)
     cb_tag.onTagDeparture = tagDeparted;
     nfcManager_registerTagCallback(&cb_tag);
 
+    // start tag-discovery
     nfcManager_enableDiscovery(DEFAULT_NFA_TECH_MASK, 0x00, 0x00, 0);
 
-    while(keepPolling)
+    // main loop, performs handling of read tags
+    while(do_poll)
     {
         nfc_tag_info_t *tag = NULL;
 
         pthread_mutex_lock(&mutex);
 
-        int tagcount = tags.size();
-
+        int tagcount = v_tags.size();
         if(tagcount)
         {
-            tag = tags.front();
-            tags.erase(tags.begin());
+            tag = v_tags.front();
+            v_tags.erase(v_tags.begin());
         }
         
         pthread_mutex_unlock(&mutex);
 
         if(tag)
         {
-            char uid[97];
-            int len = tag->uid_length;
-            if(len > 32)
-                len = 32;
-            for(int i = 0; i < len; i++) {
-                sprintf(uid + (i*3), "%02x ", tag->uid[i]);
-            }
-            uid[len*3] = '\0';
-            printf("UID: %s\n", uid);
-
+            printTagUID(tag);
             free(tag);
         }
 
-        usleep(10000);
+        usleep(MAIN_SLEEP);
     }
 
     pthread_mutex_destroy(&mutex);
 
-    printf("\nExiting...\n");
+    printf("\n\nExiting...\n");
     return 0;
 }
