@@ -19,9 +19,9 @@
 #define MAX_UID_LENGTH 32
 #define MAIN_SLEEP 10000
 
-static int do_poll = 1;
-static std::vector <nfc_tag_info_t*> v_tags;
 static pthread_mutex_t mutex;
+static std::vector <nfc_tag_info_t*> v_tags_p;
+static int do_poll = 1;
 
 static void interrupted(int signal)
 {
@@ -34,7 +34,7 @@ static void tagArrived(nfc_tag_info_t *p_taginfo)
 
     nfc_tag_info_t *temp = (nfc_tag_info_t *) malloc(sizeof(nfc_tag_info_t));
     memcpy(temp, p_taginfo, sizeof(nfc_tag_info_t));
-    v_tags.push_back(temp);
+    v_tags_p.push_back(temp);
 
     pthread_mutex_unlock(&mutex);
 }
@@ -59,42 +59,38 @@ static void printTagUID(nfc_tag_info_t *p_tag)
 
 int main(int argc, char ** argv)
 {
+    pthread_mutex_init(&mutex, NULL);
+
+    // register signal handlers
     struct sigaction act;
     memset(&act, '\0', sizeof(act));
     act.sa_handler = &interrupted;
-
     if (sigaction(SIGINT, &act, NULL) < 0 || sigaction(SIGTERM, &act, NULL))
     {
         perror("sigaction");
         exit(1);
     }
 
-    pthread_mutex_init(&mutex, NULL);
-
-
     // initialize nfcManager
-    int result = nfcManager_doInitialize();
-    if(result != 0)
+    if(nfcManager_doInitialize())
     {
-        printf("nfcManager_doInitialize failed with error code %d", result);
-        exit(result);
+        perror("nfcManager_doInitialize");
+        exit(1);
     }
-
-    // try to get versions
-    #ifdef NXP_HW_SELF_TEST
-    printf("nfcFactory_GetMwVersion:\t0x%x\n", nfcFactory_GetMwVersion());
-    #endif
-    printf("nfcManager_getFwVersion:\t0x%x\n\n", nfcManager_getFwVersion());
-
-    // set up tag-callback
     nfcTagCallback_t cb_tag;
     cb_tag.onTagArrival = tagArrived;
     cb_tag.onTagDeparture = tagDeparted;
     nfcManager_registerTagCallback(&cb_tag);
 
+    // try to get versions from chip
+    #ifdef NXP_HW_SELF_TEST
+    printf("nfcFactory_GetMwVersion:\t0x%x\n", nfcFactory_GetMwVersion());
+    #endif
+    printf("nfcManager_getFwVersion:\t0x%x\n\n", nfcManager_getFwVersion());
+
     // start tag-discovery
     // TODO is it possible to look for multiple tags "at the same time"?
-    nfcManager_enableDiscovery(DEFAULT_NFA_TECH_MASK, 0x00, 0x00, 0);
+    nfcManager_enableDiscovery(DEFAULT_NFA_TECH_MASK, 0, 0, 0);
 
     // main loop, performs handling of read tags
     while(do_poll)
@@ -102,14 +98,11 @@ int main(int argc, char ** argv)
         nfc_tag_info_t *tag = NULL;
 
         pthread_mutex_lock(&mutex);
-
-        int tagcount = v_tags.size();
-        if(tagcount)
+        if(v_tags_p.size())
         {
-            tag = v_tags.front();
-            v_tags.erase(v_tags.begin());
+            tag = v_tags_p.front();
+            v_tags_p.erase(v_tags_p.begin());
         }
-        
         pthread_mutex_unlock(&mutex);
 
         if(tag)
@@ -121,12 +114,28 @@ int main(int argc, char ** argv)
         usleep(MAIN_SLEEP);
     }
 
-    // TODO:
-    // - free remaining tags
-    // - shutdown PN7120 ?
+    printf("\n\nAborting...\n");
+
+    // free remaining tags
+    pthread_mutex_lock(&mutex);
+    while(v_tags_p.size())
+    {
+        nfc_tag_info_t *tag = v_tags_p.front();
+        v_tags_p.erase(v_tags_p.begin());
+        free(tag);
+    }
+    pthread_mutex_unlock(&mutex);
+
+    // deinitialize nfcManager
+    nfcManager_disableDiscovery();
+    nfcManager_deregisterTagCallback();
+    if(nfcManager_doDeinitialize())
+    {
+        perror("nfcManager_doDeinitialize");
+        exit(1);
+    }
 
     pthread_mutex_destroy(&mutex);
 
-    printf("\n\nExiting...\n");
     return 0;
 }
