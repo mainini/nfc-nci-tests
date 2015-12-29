@@ -28,7 +28,7 @@ static void interrupted(int signal)
     do_poll = 0;
 }
 
-void tagArrived(nfc_tag_info_t *p_taginfo)
+static void tagArrived(nfc_tag_info_t *p_taginfo)
 {
     pthread_mutex_lock(&mutex);
 
@@ -39,9 +39,9 @@ void tagArrived(nfc_tag_info_t *p_taginfo)
     pthread_mutex_unlock(&mutex);
 }
 
-void tagDeparted() { }
+static void tagDeparted() { }
 
-void printTagUID(nfc_tag_info_t *p_tag)
+static void printTagUID(nfc_tag_info_t *p_tag)
 {
     char uid[3*MAX_UID_LENGTH+1];
     int len = p_tag->uid_length;

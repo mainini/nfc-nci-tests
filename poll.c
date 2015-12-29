@@ -14,12 +14,12 @@
 
 #define MAIN_SLEEP 10000
 
-void tagArrived(nfc_tag_info_t *p_taginfo)
+static void tagArrived(nfc_tag_info_t *p_taginfo)
 {
     printf("\nTag arrived!\n");
 }
 
-void tagDeparted(void)
+static void tagDeparted(void)
 {
     printf("\nTag departed!\n");
 }
