@@ -1,3 +1,9 @@
+/*
+ * Copyright 2015 Pascal Mainini
+ * Licensed under MIT license, see included file LICENSE or
+ * http://opensource.org/licenses/MIT
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -85,6 +91,7 @@ int main(int argc, char ** argv)
     nfcManager_registerTagCallback(&cb_tag);
 
     // start tag-discovery
+    // TODO is it possible to look for multiple tags "at the same time"?
     nfcManager_enableDiscovery(DEFAULT_NFA_TECH_MASK, 0x00, 0x00, 0);
 
     // main loop, performs handling of read tags
@@ -111,6 +118,10 @@ int main(int argc, char ** argv)
 
         usleep(MAIN_SLEEP);
     }
+
+    // TODO:
+    // - free remaining tags
+    // - shutdown PN7120 ?
 
     pthread_mutex_destroy(&mutex);
 
