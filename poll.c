@@ -45,7 +45,7 @@ int main(int argc, char ** argv)
 	cb_tag.onTagDeparture = tagDeparted;
 	nfcManager_registerTagCallback(&cb_tag);
 
-	nfcManager_enableDiscovery(DEFAULT_NFA_TECH_MASK, 0x00, 0x00, 0);
+	nfcManager_enableDiscovery(DEFAULT_NFA_TECH_MASK, 0, 0, 0);
 
     while(1) {
         usleep(MAIN_SLEEP);
