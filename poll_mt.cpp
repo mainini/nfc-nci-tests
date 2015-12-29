@@ -48,7 +48,8 @@ static void printTagUID(nfc_tag_info_t *p_tag)
     if(len > MAX_UID_LENGTH)
         len = MAX_UID_LENGTH;
 
-    for(int i = 0; i < len; i++) {
+    for(int i = 0; i < len; i++)
+    {
         sprintf(uid + (i*3), "%02x ", p_tag->uid[i]);
     }
     uid[len*3] = '\0';
@@ -62,7 +63,8 @@ int main(int argc, char ** argv)
     memset(&act, '\0', sizeof(act));
     act.sa_handler = &interrupted;
 
-    if (sigaction(SIGINT, &act, NULL) < 0 || sigaction(SIGTERM, &act, NULL)) {
+    if (sigaction(SIGINT, &act, NULL) < 0 || sigaction(SIGTERM, &act, NULL))
+    {
         perror("sigaction");
         exit(1);
     }
