@@ -9,6 +9,8 @@
 # Needs I²C-data as bytes in the form 0xNN0xNN...0xNN - all other, non hex values
 # are ignored. Data can be given as parameter, via stdin or read from specified file.
 #
+# TODO handle fragmentation
+#
 
 from __future__ import print_function
 import sys
